@@ -48,6 +48,10 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# Constants for token storage
+CONF_RMTOKEN = "_rmtoken"
+CONF_DEVICE_ID = "_device_id"
+
 
 class HyundaiKiaConnectDataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching data from the API."""
@@ -69,6 +73,11 @@ class HyundaiKiaConnectDataUpdateCoordinator(DataUpdateCoordinator):
             ),
             language=hass.config.language,
         )
+        
+        # Restore token from config - check multiple formats for compatibility
+        token_restored = False
+        
+        # Format 1: token_data dict (original format)
         if "token_data" in config_entry.data:
             token_data = config_entry.data["token_data"]
             self.vehicle_manager.token = Token(
@@ -81,6 +90,30 @@ class HyundaiKiaConnectDataUpdateCoordinator(DataUpdateCoordinator):
                 if token_data.get("valid_until")
                 else None,
             )
+            token_restored = True
+            _LOGGER.debug(f"{DOMAIN} - Restored token from token_data format")
+        
+        # Format 2: _rmtoken and _device_id (new format from OTP flow)
+        elif config_entry.data.get(CONF_RMTOKEN):
+            self.vehicle_manager.token = Token(
+                username=config_entry.data.get(CONF_USERNAME),
+                password=config_entry.data.get(CONF_PASSWORD),
+                access_token="",  # Will be refreshed on first use
+                refresh_token=config_entry.data.get(CONF_RMTOKEN),
+                device_id=config_entry.data.get(CONF_DEVICE_ID),
+                valid_until=None,  # Force refresh on first use
+            )
+            # Also set the device_id on the API instance
+            if config_entry.data.get(CONF_DEVICE_ID):
+                self.vehicle_manager.api.device_id = config_entry.data.get(CONF_DEVICE_ID)
+            token_restored = True
+            _LOGGER.debug(f"{DOMAIN} - Restored token from _rmtoken format")
+        
+        if token_restored:
+            _LOGGER.info(f"{DOMAIN} - Token restored from config, rmtoken available for re-authentication")
+        else:
+            _LOGGER.debug(f"{DOMAIN} - No stored token found, will require fresh login")
+            
         self.scan_interval: int = (
             config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL) * 60
         )
