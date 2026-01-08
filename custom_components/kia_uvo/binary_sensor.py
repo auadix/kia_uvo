@@ -291,6 +291,18 @@ SENSOR_DESCRIPTIONS: Final[tuple[HyundaiKiaBinarySensorEntityDescription, ...]] 
         device_class=BinarySensorDeviceClass.PROBLEM,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    # =========================================================================
+    # NEW: Engine Oil Warning
+    # =========================================================================
+    HyundaiKiaBinarySensorEntityDescription(
+        key="engine_oil_warning_is_on",
+        name="Engine Oil Warning",
+        is_on=lambda vehicle: vehicle.engine_oil_warning_is_on,
+        on_icon="mdi:oil-level",
+        off_icon="mdi:oil",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
     HyundaiKiaBinarySensorEntityDescription(
         key="sunroof_is_open",
         name="Sunroof",
@@ -450,6 +462,26 @@ SENSOR_DESCRIPTIONS: Final[tuple[HyundaiKiaBinarySensorEntityDescription, ...]] 
         is_on=lambda vehicle: vehicle.rear_right_seat_status,
         on_icon="mdi:seat-heater",
         off_icon="mdi:seat-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    # =========================================================================
+    # NEW: Valet Mode and Remote Control
+    # =========================================================================
+    HyundaiKiaBinarySensorEntityDescription(
+        key="valet_parking_mode",
+        name="Valet Mode",
+        is_on=lambda vehicle: vehicle.valet_parking_mode,
+        on_icon="mdi:account-key",
+        off_icon="mdi:account-key-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    HyundaiKiaBinarySensorEntityDescription(
+        key="remote_control_available",
+        name="Remote Control Available",
+        is_on=lambda vehicle: vehicle.remote_control_available,
+        on_icon="mdi:remote",
+        off_icon="mdi:remote-off",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
 )

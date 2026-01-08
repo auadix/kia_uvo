@@ -12,6 +12,7 @@ from hyundai_kia_connect_api import (
     ClimateRequestOptions,
     WindowRequestOptions,
     ScheduleChargingClimateRequestOptions,
+    Token,
 )
 from hyundai_kia_connect_api.exceptions import AuthenticationError
 
@@ -68,6 +69,18 @@ class HyundaiKiaConnectDataUpdateCoordinator(DataUpdateCoordinator):
             ),
             language=hass.config.language,
         )
+        if "token_data" in config_entry.data:
+            token_data = config_entry.data["token_data"]
+            self.vehicle_manager.token = Token(
+                username=config_entry.data.get(CONF_USERNAME),
+                password=config_entry.data.get(CONF_PASSWORD),
+                access_token=token_data.get("access_token"),
+                refresh_token=token_data.get("refresh_token"),
+                device_id=token_data.get("device_id"),
+                valid_until=dt_util.parse_datetime(token_data.get("valid_until"))
+                if token_data.get("valid_until")
+                else None,
+            )
         self.scan_interval: int = (
             config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL) * 60
         )

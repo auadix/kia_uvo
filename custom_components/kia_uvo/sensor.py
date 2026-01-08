@@ -19,6 +19,9 @@ from homeassistant.const import (
     UnitOfEnergy,
     UnitOfPower,
     UnitOfTime,
+    UnitOfLength,
+    UnitOfSpeed,
+    UnitOfTemperature,
     EntityCategory,
 )
 
@@ -96,14 +99,14 @@ SENSOR_DESCRIPTIONS: Final[tuple[SensorEntityDescription, ...]] = (
         key="ev_battery_remain",
         name="EV Battery Level",
         native_unit_of_measurement=UnitOfEnergy.KILO_JOULE,
-        device_class=SensorDeviceClass.ENERGY_STORAGE,
+        device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.MEASUREMENT,
     ),
     SensorEntityDescription(
         key="ev_battery_capacity",
         name="EV Battery Capacity",
         native_unit_of_measurement=UnitOfEnergy.KILO_JOULE,
-        device_class=SensorDeviceClass.ENERGY_STORAGE,
+        device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
@@ -272,6 +275,57 @@ SENSOR_DESCRIPTIONS: Final[tuple[SensorEntityDescription, ...]] = (
         icon="mdi:identifier",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    # =========================================================================
+    # NEW SENSORS ADDED - Weather, Location Extended, Distance to Empty
+    # =========================================================================
+    SensorEntityDescription(
+        key="weather_type",
+        name="Weather Type",
+        icon="mdi:weather-partly-cloudy",
+    ),
+    SensorEntityDescription(
+        key="_weather_outside_temp",
+        name="Outside Temperature",
+        icon="mdi:thermometer",
+        native_unit_of_measurement=DYNAMIC_UNIT,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="_location_heading",
+        name="Heading",
+        icon="mdi:compass",
+        native_unit_of_measurement="°",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="_location_speed",
+        name="Speed",
+        icon="mdi:speedometer",
+        native_unit_of_measurement=DYNAMIC_UNIT,
+        device_class=SensorDeviceClass.SPEED,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="_distance_to_empty",
+        name="Distance to Empty",
+        icon="mdi:gas-station",
+        native_unit_of_measurement=DYNAMIC_UNIT,
+        device_class=SensorDeviceClass.DISTANCE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="valet_parking_mode",
+        name="Valet Mode",
+        icon="mdi:account-key",
+    ),
+    SensorEntityDescription(
+        key="engine_runtime",
+        name="Engine Runtime",
+        icon="mdi:engine",
+        native_unit_of_measurement=UnitOfTime.MINUTES,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
 )
 
 
@@ -338,7 +392,7 @@ class HyundaiKiaConnectSensor(SensorEntity, HyundaiKiaConnectEntity):
     def native_unit_of_measurement(self):
         """Return the unit the value was reported in by the sensor"""
         if self._description.native_unit_of_measurement == DYNAMIC_UNIT:
-            return getattr(self.vehicle, self._key + "_unit")
+            return getattr(self.vehicle, self._key + "_unit", None)
         else:
             return self._description.native_unit_of_measurement
 
