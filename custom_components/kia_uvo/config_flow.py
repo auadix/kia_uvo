@@ -111,16 +111,22 @@ OPTIONS_SCHEMA = vol.Schema(
 class OtpRequiredException(Exception):
     """Raised when OTP verification is required."""
     
-    def __init__(self, otp_context: dict):
+    def __init__(self, otp_context: dict, api=None):
         self.otp_context = otp_context
+        self.api = api
         super().__init__("OTP verification required")
+
+
+def _check_api_has_otp_support(api) -> bool:
+    """Check if the API instance has OTP support methods."""
+    return hasattr(api, 'start_login') and hasattr(api, 'verify_otp_and_complete_login')
 
 
 async def validate_input(hass: HomeAssistant, user_input: dict[str, Any]) -> Token:
     """Validate the user input allows us to connect.
     
-    For Kia USA, this uses start_login which may raise OtpRequiredException
-    if OTP is needed.
+    For Kia USA with OTP support, uses start_login which may raise OtpRequiredException.
+    Falls back to standard login() for other regions or if OTP methods unavailable.
     """
     try:
         is_kia_usa = (
@@ -128,13 +134,15 @@ async def validate_input(hass: HomeAssistant, user_input: dict[str, Any]) -> Tok
             and BRANDS[user_input[CONF_BRAND]] == BRAND_KIA
         )
         
-        if is_kia_usa:
-            # Use the API directly for Kia USA to handle OTP flow
-            api = VehicleManager.get_implementation_by_region_brand(
-                user_input[CONF_REGION],
-                user_input[CONF_BRAND],
-                language=hass.config.language,
-            )
+        # Get the API implementation
+        api = VehicleManager.get_implementation_by_region_brand(
+            user_input[CONF_REGION],
+            user_input[CONF_BRAND],
+            language=hass.config.language,
+        )
+        
+        if is_kia_usa and _check_api_has_otp_support(api):
+            _LOGGER.debug(f"{DOMAIN} - Using OTP-enabled login flow for Kia USA")
             
             # Call start_login which returns (Token, None) or (None, otp_context)
             result = await hass.async_add_executor_job(
@@ -149,20 +157,15 @@ async def validate_input(hass: HomeAssistant, user_input: dict[str, Any]) -> Tok
             if otp_context is not None:
                 # OTP is required - add device_id and api to context
                 otp_context["device_id"] = api.device_id
-                otp_context["api"] = api
-                raise OtpRequiredException(otp_context)
+                raise OtpRequiredException(otp_context, api=api)
             
             if token is None:
                 raise InvalidAuth
             
             return token
         else:
-            # Standard flow for other regions
-            api = VehicleManager.get_implementation_by_region_brand(
-                user_input[CONF_REGION],
-                user_input[CONF_BRAND],
-                language=hass.config.language,
-            )
+            # Standard flow for other regions or if OTP not supported
+            _LOGGER.debug(f"{DOMAIN} - Using standard login flow")
             
             token: Token = await hass.async_add_executor_job(
                 api.login, user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
@@ -248,7 +251,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # Store token data for persistence
                 full_config["token_data"] = {
                     "access_token": token.access_token,
-                    "refresh_token": token.refresh_token,
+                    "refresh_token": getattr(token, "refresh_token", None),
                     "device_id": getattr(token, "device_id", None),
                     "valid_until": token.valid_until.isoformat() if token.valid_until else None,
                 }
@@ -257,7 +260,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # Store context for OTP step
                 self._otp_context = otp_ex.otp_context
                 self._otp_context["input"] = full_config
-                self._api = self._otp_context.pop("api", None)
+                self._api = otp_ex.api
                 
                 # Send OTP automatically
                 if self._api and self._otp_context.get("otpKey"):
@@ -281,8 +284,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_otp()
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
-            except Exception:  # pylint: disable=broad-except
-                _LOGGER.exception("Unexpected exception")
+            except Exception as ex:  # pylint: disable=broad-except
+                _LOGGER.exception(f"Unexpected exception: {ex}")
                 errors["base"] = "unknown"
             else:
                 if self.reauth_entry is None:
@@ -340,7 +343,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # Store token data for persistence (including rmtoken)
                 full_config["token_data"] = {
                     "access_token": token.access_token,
-                    "refresh_token": token.refresh_token,  # This is the rmtoken!
+                    "refresh_token": getattr(token, "refresh_token", None),  # This is the rmtoken!
                     "device_id": getattr(token, "device_id", None),
                     "valid_until": token.valid_until.isoformat() if token.valid_until else None,
                 }
@@ -393,7 +396,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # Store token data for persistence
                 full_config["token_data"] = {
                     "access_token": token.access_token,
-                    "refresh_token": token.refresh_token,
+                    "refresh_token": getattr(token, "refresh_token", None),
                     "device_id": getattr(token, "device_id", None),
                     "valid_until": token.valid_until.isoformat() if token.valid_until else None,
                 }
