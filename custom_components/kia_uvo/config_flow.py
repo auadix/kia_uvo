@@ -45,7 +45,6 @@ from .const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
 )
-from .kia_uvo_api_fix import PatchedKiaUvoApiUSA, OtpRequiredException
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -109,43 +108,70 @@ OPTIONS_SCHEMA = vol.Schema(
 )
 
 
+class OtpRequiredException(Exception):
+    """Raised when OTP verification is required."""
+    
+    def __init__(self, otp_context: dict):
+        self.otp_context = otp_context
+        super().__init__("OTP verification required")
+
+
 async def validate_input(hass: HomeAssistant, user_input: dict[str, Any]) -> Token:
-    """Validate the user input allows us to connect."""
+    """Validate the user input allows us to connect.
+    
+    For Kia USA, this uses start_login which may raise OtpRequiredException
+    if OTP is needed.
+    """
     try:
-        # BYPASS VehicleManager for Kia USA to use our patch
         is_kia_usa = (
             REGIONS[user_input[CONF_REGION]] == REGION_USA 
             and BRANDS[user_input[CONF_BRAND]] == BRAND_KIA
         )
         
         if is_kia_usa:
-             # Instantiate our patch directly
-             # Arguments match KiaUvoApiUSA init: region, brand, language, device_id (optional)
-             # Wait, KiaUvoApiUSA init signature in library is (username, password, region, brand, language)
-             # My Patch signature is (username, password, region, brand, language, device_id)
-             api = PatchedKiaUvoApiUSA(
-                user_input[CONF_USERNAME], 
-                user_input[CONF_PASSWORD],
-                user_input[CONF_REGION],
-                user_input[CONF_BRAND],
-                language=hass.config.language
-             )
-        else:
-             # Standard flow for others
+            # Use the API directly for Kia USA to handle OTP flow
             api = VehicleManager.get_implementation_by_region_brand(
                 user_input[CONF_REGION],
                 user_input[CONF_BRAND],
                 language=hass.config.language,
             )
             
-        token: Token = await hass.async_add_executor_job(
-            api.login, user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
-        )
+            # Call start_login which returns (Token, None) or (None, otp_context)
+            result = await hass.async_add_executor_job(
+                api.start_login,
+                user_input[CONF_USERNAME],
+                user_input[CONF_PASSWORD],
+                None,  # No existing token
+            )
+            
+            token, otp_context = result
+            
+            if otp_context is not None:
+                # OTP is required - add device_id and api to context
+                otp_context["device_id"] = api.device_id
+                otp_context["api"] = api
+                raise OtpRequiredException(otp_context)
+            
+            if token is None:
+                raise InvalidAuth
+            
+            return token
+        else:
+            # Standard flow for other regions
+            api = VehicleManager.get_implementation_by_region_brand(
+                user_input[CONF_REGION],
+                user_input[CONF_BRAND],
+                language=hass.config.language,
+            )
+            
+            token: Token = await hass.async_add_executor_job(
+                api.login, user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
+            )
 
-        if token is None:
-            raise InvalidAuth
+            if token is None:
+                raise InvalidAuth
 
-        return token
+            return token
     except AuthenticationError as err:
         raise InvalidAuth from err
 
@@ -181,6 +207,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize the config flow."""
         self._region_data = None
         self._otp_context = None
+        self._api = None  # Store the API instance for OTP verification
 
     @staticmethod
     @callback
@@ -216,15 +243,41 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             full_config = {**self._region_data, **user_input}
 
             try:
-                await validate_input(self.hass, full_config)
-            except OtpRequiredException as otp_ex:
-                # Store context including device_id
-                self._otp_context = {
-                    "otp_key": otp_ex.otp_key,
-                    "xid": otp_ex.xid,
-                    "device_id": otp_ex.device_id,
-                    "input": full_config
+                token = await validate_input(self.hass, full_config)
+                
+                # Store token data for persistence
+                full_config["token_data"] = {
+                    "access_token": token.access_token,
+                    "refresh_token": token.refresh_token,
+                    "device_id": getattr(token, "device_id", None),
+                    "valid_until": token.valid_until.isoformat() if token.valid_until else None,
                 }
+                
+            except OtpRequiredException as otp_ex:
+                # Store context for OTP step
+                self._otp_context = otp_ex.otp_context
+                self._otp_context["input"] = full_config
+                self._api = self._otp_context.pop("api", None)
+                
+                # Send OTP automatically
+                if self._api and self._otp_context.get("otpKey"):
+                    try:
+                        await self.hass.async_add_executor_job(
+                            self._api.send_otp,
+                            self._otp_context["otpKey"],
+                            "EMAIL",  # Default to email
+                            self._otp_context.get("xid", ""),
+                        )
+                        _LOGGER.info(f"{DOMAIN} - OTP sent to email")
+                    except Exception as e:
+                        _LOGGER.error(f"{DOMAIN} - Failed to send OTP: {e}")
+                        errors["base"] = "unknown"
+                        return self.async_show_form(
+                            step_id="credentials_password",
+                            data_schema=STEP_CREDENTIALS_DATA_SCHEMA,
+                            errors=errors,
+                        )
+                
                 return await self.async_step_otp()
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
@@ -261,27 +314,38 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             otp_code = user_input["otp_code"]
             full_config = self._otp_context["input"]
-            device_id = self._otp_context.get("device_id") # Get persisted device_id
             
             try:
-                # Instantiate patched API manually reusing credentials AND device_id
-                api = PatchedKiaUvoApiUSA(
-                    full_config[CONF_USERNAME], 
+                if self._api is None:
+                    # Recreate API if needed
+                    self._api = VehicleManager.get_implementation_by_region_brand(
+                        full_config[CONF_REGION],
+                        full_config[CONF_BRAND],
+                        language=self.hass.config.language,
+                    )
+                    # Restore device_id
+                    if self._otp_context.get("device_id"):
+                        self._api.device_id = self._otp_context["device_id"]
+                
+                # Verify OTP and complete login
+                token = await self.hass.async_add_executor_job(
+                    self._api.verify_otp_and_complete_login,
+                    full_config[CONF_USERNAME],
                     full_config[CONF_PASSWORD],
-                    full_config[CONF_REGION],
-                    full_config[CONF_BRAND],
-                    language=self.hass.config.language,
-                    device_id=device_id # Pass existing device_id
+                    self._otp_context["otpKey"],
+                    self._otp_context.get("xid", ""),
+                    otp_code,
                 )
                 
-                # Verify OTP (Executes in thread pool to avoid blocking loop)
-                # verify_otp_fix returns the Token which we assume is valid
-                await self.hass.async_add_executor_job(
-                    api.verify_otp_fix,
-                    otp_code,
-                    self._otp_context["otp_key"],
-                    self._otp_context["xid"]
-                )
+                # Store token data for persistence (including rmtoken)
+                full_config["token_data"] = {
+                    "access_token": token.access_token,
+                    "refresh_token": token.refresh_token,  # This is the rmtoken!
+                    "device_id": getattr(token, "device_id", None),
+                    "valid_until": token.valid_until.isoformat() if token.valid_until else None,
+                }
+                
+                _LOGGER.info(f"{DOMAIN} - OTP verification successful, rmtoken stored for future logins")
                 
                 # If success
                 if self.reauth_entry is None:
@@ -300,21 +364,23 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     )
                     return self.async_abort(reason="reauth_successful")
 
-            except Exception:
-                _LOGGER.exception("OTP Verification Failed")
+            except Exception as e:
+                _LOGGER.exception(f"OTP Verification Failed: {e}")
                 errors["base"] = "invalid_auth"
 
+        email_hint = self._otp_context.get("email", self._otp_context["input"].get(CONF_USERNAME, "your email"))
+        
         return self.async_show_form(
             step_id="otp",
             data_schema=STEP_OTP_DATA_SCHEMA,
             errors=errors,
-            description_placeholders={"email": self._otp_context["input"][CONF_USERNAME]}
+            description_placeholders={"email": email_hint}
         )
 
     async def async_step_credentials_token(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle the credentials step."""
+        """Handle the credentials step for EU (token-based)."""
         errors = {}
 
         if user_input is not None:
@@ -322,7 +388,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             full_config = {**self._region_data, **user_input}
 
             try:
-                await validate_input(self.hass, full_config)
+                token = await validate_input(self.hass, full_config)
+                
+                # Store token data for persistence
+                full_config["token_data"] = {
+                    "access_token": token.access_token,
+                    "refresh_token": token.refresh_token,
+                    "device_id": getattr(token, "device_id", None),
+                    "valid_until": token.valid_until.isoformat() if token.valid_until else None,
+                }
+                
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
             except Exception:  # pylint: disable=broad-except

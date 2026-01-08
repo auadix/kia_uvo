@@ -31,6 +31,13 @@
       "reauth_confirm": {
         "title": "Hyundai / Kia Connect - Reauthentication",
         "description": "Your account is unable to authenticate. Click Submit to re-setup."
+      },
+      "otp": {
+        "title": "Hyundai / Kia Connect - OTP Verification",
+        "description": "A one-time password (OTP) has been sent to {email}. Please enter the code below.",
+        "data": {
+          "otp_code": "OTP Code"
+        }
       }
     },
     "abort": {
