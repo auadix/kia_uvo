@@ -484,6 +484,26 @@ SENSOR_DESCRIPTIONS: Final[tuple[HyundaiKiaBinarySensorEntityDescription, ...]] 
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    # =========================================================================
+    # NEW: Tail Lamp and Hazard Status
+    # =========================================================================
+    HyundaiKiaBinarySensorEntityDescription(
+        key="tail_lamp_status",
+        name="Tail Lamp Fault",
+        is_on=lambda vehicle: vehicle.tail_lamp_status,
+        on_icon="mdi:lightbulb-alert-outline",
+        off_icon="mdi:lightbulb-outline",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    HyundaiKiaBinarySensorEntityDescription(
+        key="hazard_status",
+        name="Hazard Lights",
+        is_on=lambda vehicle: vehicle.hazard_status,
+        on_icon="mdi:hazard-lights",
+        off_icon="mdi:hazard-lights",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
 )
 
 

@@ -75,6 +75,13 @@ SENSOR_DESCRIPTIONS: Final[tuple[SensorEntityDescription, ...]] = (
         state_class=SensorStateClass.MEASUREMENT,
     ),
     SensorEntityDescription(
+        key="car_battery_warning",
+        name="Car Battery Warning Level",
+        icon="mdi:car-battery-alert",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    SensorEntityDescription(
         key="last_updated_at",
         name="Last Updated At",
         icon="mdi:update",
