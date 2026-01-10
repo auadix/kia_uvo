@@ -413,7 +413,11 @@ class HyundaiKiaConnectSensor(SensorEntity, HyundaiKiaConnectEntity):
     def native_unit_of_measurement(self):
         """Return the unit the value was reported in by the sensor"""
         if self._description.native_unit_of_measurement == DYNAMIC_UNIT:
-            return getattr(self.vehicle, self._key + "_unit", None)
+            unit = getattr(self.vehicle, self._key + "_unit", None)
+            # Special handling for speed sensor - default to mph for USA region
+            if unit is None and self._key == "_location_speed":
+                return "mph"
+            return unit
         else:
             return self._description.native_unit_of_measurement
 
