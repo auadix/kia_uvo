@@ -504,6 +504,23 @@ SENSOR_DESCRIPTIONS: Final[tuple[HyundaiKiaBinarySensorEntityDescription, ...]] 
         off_icon="mdi:hazard-lights",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    HyundaiKiaBinarySensorEntityDescription(
+        key="stop_lamp_status",
+        name="Stop Lamp Fault",
+        is_on=lambda vehicle: vehicle.stop_lamp_status,
+        on_icon="mdi:lightbulb-alert-outline",
+        off_icon="mdi:lightbulb-outline",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    HyundaiKiaBinarySensorEntityDescription(
+        key="finance_registered",
+        name="Finance Registered",
+        is_on=lambda vehicle: vehicle.finance_registered,
+        on_icon="mdi:bank-check",
+        off_icon="mdi:bank-off",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
 )
 
 

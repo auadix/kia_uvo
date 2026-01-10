@@ -82,6 +82,20 @@ SENSOR_DESCRIPTIONS: Final[tuple[SensorEntityDescription, ...]] = (
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     SensorEntityDescription(
+        key="rsa_status",
+        name="Roadside Assistance Status",
+        icon="mdi:tow-truck",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    SensorEntityDescription(
+        key="link_status",
+        name="Link Status",
+        icon="mdi:link-variant",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    SensorEntityDescription(
         key="last_updated_at",
         name="Last Updated At",
         icon="mdi:update",
