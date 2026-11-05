@@ -2,6 +2,7 @@
 
 import hashlib
 import logging
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -12,7 +13,7 @@ from homeassistant.const import (
     CONF_USERNAME,
     Platform,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntry
@@ -54,8 +55,46 @@ async def async_setup(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     return True
 
 
+# Fork keys whose data upstream exposes under its own key; moved to keep history.
+FORK_RENAMED_KEYS: dict[str, str] = {
+    "hazard_status": "hazard_lights_on",
+    "engine_oil_warning_is_on": "oil_level_warning_is_on",
+}
+
+
+async def _async_migrate_fork_unique_ids(
+    hass: HomeAssistant, config_entry: ConfigEntry
+) -> None:
+    """Move entities created by the earlier fork onto upstream's keys."""
+    registry = er.async_get(hass)
+
+    @callback
+    def _migrate(entry: er.RegistryEntry) -> dict[str, Any] | None:
+        if entry.domain != "binary_sensor":
+            return None
+        for old_key, new_key in FORK_RENAMED_KEYS.items():
+            suffix = f"_{old_key}"
+            if not entry.unique_id.endswith(suffix):
+                continue
+            new_unique_id = f"{entry.unique_id[: -len(suffix)]}_{new_key}"
+            if registry.async_get_entity_id("binary_sensor", DOMAIN, new_unique_id):
+                # Upstream's entity already exists; leave both untouched.
+                return None
+            _LOGGER.info(
+                "Migrating %s unique_id %s -> %s",
+                entry.entity_id,
+                entry.unique_id,
+                new_unique_id,
+            )
+            return {"new_unique_id": new_unique_id}
+        return None
+
+    await er.async_migrate_entries(hass, config_entry.entry_id, _migrate)
+
+
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Set up Hyundai / Kia Connect from a config entry."""
+    await _async_migrate_fork_unique_ids(hass, config_entry)
     coordinator = HyundaiKiaConnectDataUpdateCoordinator(hass, config_entry)
     try:
         await coordinator.async_config_entry_first_refresh()
