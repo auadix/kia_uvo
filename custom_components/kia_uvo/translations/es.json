@@ -620,6 +620,30 @@
           "before_30min": "30 minutos antes",
           "off": "Desactivado"
         }
+      },
+      "distance_to_empty": {
+        "name": "Distance to Empty"
+      },
+      "location_heading": {
+        "name": "Heading"
+      },
+      "location_speed": {
+        "name": "Speed"
+      },
+      "weather_type": {
+        "name": "Weather Type"
+      },
+      "valet_parking_mode": {
+        "name": "Valet Mode"
+      },
+      "car_battery_warning": {
+        "name": "Car Battery Warning Level"
+      },
+      "rsa_status": {
+        "name": "Roadside Assistance Status"
+      },
+      "link_status": {
+        "name": "Link Status"
       }
     },
     "binary_sensor": {
@@ -847,6 +871,21 @@
       },
       "battery_auxiliary_fail_warning_is_on": {
         "name": "Fallo de la Batería de 12V"
+      },
+      "valet_parking_mode": {
+        "name": "Valet Mode"
+      },
+      "remote_control_available": {
+        "name": "Remote Control Available"
+      },
+      "tail_lamp_status": {
+        "name": "Tail Lamp Fault"
+      },
+      "stop_lamp_status": {
+        "name": "Stop Lamp Fault"
+      },
+      "finance_registered": {
+        "name": "Finance Registered"
       }
     },
     "lock": {

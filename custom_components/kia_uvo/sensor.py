@@ -649,6 +649,61 @@ SENSOR_DESCRIPTIONS: Final[tuple[HyundaiKiaSensorEntityDescription, ...]] = (
         state_class=SensorStateClass.MEASUREMENT,
         exists=lambda vehicle: vehicle.average_fuel_economy_unit is not None,
     ),
+    # Kia USA status fields; keys kept from the auadix fork so unique IDs don't change.
+    HyundaiKiaSensorEntityDescription(
+        key="_distance_to_empty",
+        translation_key="distance_to_empty",
+        icon="mdi:gas-station",
+        device_class=SensorDeviceClass.DISTANCE,
+        native_unit_of_measurement=DYNAMIC_UNIT,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    HyundaiKiaSensorEntityDescription(
+        key="_location_heading",
+        translation_key="location_heading",
+        icon="mdi:compass",
+        native_unit_of_measurement="°",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    HyundaiKiaSensorEntityDescription(
+        key="_location_speed",
+        translation_key="location_speed",
+        icon="mdi:speedometer",
+        device_class=SensorDeviceClass.SPEED,
+        native_unit_of_measurement=DYNAMIC_UNIT,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    HyundaiKiaSensorEntityDescription(
+        key="weather_type",
+        translation_key="weather_type",
+        icon="mdi:weather-partly-cloudy",
+    ),
+    HyundaiKiaSensorEntityDescription(
+        key="valet_parking_mode",
+        translation_key="valet_parking_mode",
+        icon="mdi:account-key",
+    ),
+    HyundaiKiaSensorEntityDescription(
+        key="car_battery_warning",
+        translation_key="car_battery_warning",
+        icon="mdi:car-battery-alert",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    HyundaiKiaSensorEntityDescription(
+        key="rsa_status",
+        translation_key="rsa_status",
+        icon="mdi:tow-truck",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    HyundaiKiaSensorEntityDescription(
+        key="link_status",
+        translation_key="link_status",
+        icon="mdi:link-variant",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
 )
 
 

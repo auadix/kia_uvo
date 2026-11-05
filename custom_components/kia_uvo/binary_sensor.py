@@ -609,6 +609,52 @@ SENSOR_DESCRIPTIONS: Final[tuple[HyundaiKiaBinarySensorEntityDescription, ...]] 
         device_class=BinarySensorDeviceClass.PROBLEM,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    # Kia USA status fields; keys kept from the auadix fork so unique IDs don't change.
+    HyundaiKiaBinarySensorEntityDescription(
+        key="valet_parking_mode",
+        translation_key="valet_parking_mode",
+        is_on=lambda vehicle: vehicle.valet_parking_mode,
+        on_icon="mdi:account-key",
+        off_icon="mdi:account-key-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    HyundaiKiaBinarySensorEntityDescription(
+        key="remote_control_available",
+        translation_key="remote_control_available",
+        is_on=lambda vehicle: vehicle.remote_control_available,
+        on_icon="mdi:remote",
+        off_icon="mdi:remote-off",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    HyundaiKiaBinarySensorEntityDescription(
+        key="tail_lamp_status",
+        translation_key="tail_lamp_status",
+        is_on=lambda vehicle: (
+            None if vehicle.tail_lamp_status is None else bool(vehicle.tail_lamp_status)
+        ),
+        on_icon="mdi:lightbulb-alert-outline",
+        off_icon="mdi:lightbulb-outline",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    HyundaiKiaBinarySensorEntityDescription(
+        key="stop_lamp_status",
+        translation_key="stop_lamp_status",
+        is_on=lambda vehicle: vehicle.stop_lamp_status,
+        on_icon="mdi:lightbulb-alert-outline",
+        off_icon="mdi:lightbulb-outline",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    HyundaiKiaBinarySensorEntityDescription(
+        key="finance_registered",
+        translation_key="finance_registered",
+        is_on=lambda vehicle: vehicle.finance_registered,
+        on_icon="mdi:bank-check",
+        off_icon="mdi:bank-off",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
 )
 
 
